@@ -27,37 +27,47 @@ RUN_HOURS = ["00", "03", "06", "09", "12", "15", "18", "21"]
 MIN_STEPS = 27          # ein Lauf gilt als "fertig", wenn alle Parameter mind. so viele Stunden haben
 UA = {"User-Agent": "gewitterblick-map-builder/1.0"}
 
-# Farbstops: (Anteil 0..1 zwischen min und max, "#RRGGBB" oder "#RRGGBBAA")
-# Palette ist an die Farben der App angelehnt.
+# Farbstops: (Anteil 0..1 zwischen min und max, "#RRGGBB" oder "#RRGGBBAA"); gamma<1 streckt kleine Werte.
+# Parameter, die der DWD nicht (mehr) liefert, werden automatisch uebersprungen.
+K = lambda a: a - 273.15
+TEMP = [(0,"#8A2BE2"),(.12,"#4B3FD8"),(.25,"#2E7BFF"),(.38,"#27C6E8"),(.5,"#3ECF8E"),(.6,"#B6E34A"),(.7,"#FFE14A"),(.8,"#FF9B45"),(.9,"#FF4D4D"),(1,"#C2185B")]
 PARAMS = {
-    "t2m": dict(
-        var="t_2m", title="Temperatur (2 m)", unit="°C", min=-15, max=40, decimals=0,
-        conv=lambda a: a - 273.15,
-        stops=[(0.00, "#B18CFF"), (0.20, "#6E9CFF"), (0.40, "#2DD4BF"), (0.55, "#3ECF8E"),
-               (0.68, "#F0C93E"), (0.82, "#FF9B45"), (1.00, "#FF5A5A")]),
-    "td2m": dict(
-        var="td_2m", title="Taupunkt (2 m)", unit="°C", min=-10, max=25, decimals=0,
-        conv=lambda a: a - 273.15,
-        stops=[(0.00, "#243B6B"), (0.35, "#2DD4BF"), (0.65, "#3ECF8E"), (0.85, "#F0C93E"), (1.00, "#FF9B45")]),
-    "precip": dict(
-        var="tot_prec", title="Niederschlag (stündlich)", unit="mm", min=0, max=20, decimals=1,
-        conv=None, hourly_diff=True, transparent_below=0.1,
-        stops=[(0.00, "#2DD4BF99"), (0.05, "#2DD4BFCC"), (0.20, "#6E9CFF"), (0.45, "#B18CFF"),
-               (0.70, "#FF7FB0"), (1.00, "#FF5A5A")]),
-    "gust": dict(
-        var="vmax_10m", title="Windböen (10 m)", unit="km/h", min=0, max=130, decimals=0,
-        conv=lambda a: a * 3.6, transparent_below=15,
-        stops=[(0.00, "#3ECF8E55"), (0.25, "#3ECF8E"), (0.45, "#F0C93E"), (0.65, "#FF9B45"),
-               (0.85, "#FF5A5A"), (1.00, "#B18CFF")]),
-    "cape": dict(
-        var="cape_ml", title="CAPE (Gewitterenergie)", unit="J/kg", min=0, max=3000, decimals=0,
-        conv=None, transparent_below=50,
-        stops=[(0.00, "#3ECF8E88"), (0.15, "#3ECF8E"), (0.40, "#F0C93E"), (0.70, "#FF9B45"), (1.00, "#FF5A5A")]),
-    "cloud": dict(
-        var="clct", title="Bewölkung", unit="%", min=0, max=100, decimals=0,
-        conv=None, transparent_below=8,
-        stops=[(0.00, "#DCE6FF00"), (0.30, "#DCE6FF55"), (1.00, "#F4F7FFD0")]),
+ "t2m":   dict(vars=["t_2m"], title="Temperatur (2 m)", unit="°C", min=-20, max=40, decimals=0, conv=K, stops=TEMP),
+ "td2m":  dict(vars=["td_2m"], title="Taupunkt (2 m)", unit="°C", min=-20, max=25, decimals=0, conv=K, stops=TEMP),
+ "rh":    dict(vars=["relhum_2m"], title="Luftfeuchte (2 m)", unit="%", min=20, max=100, decimals=0,
+               stops=[(0,"#E8B04A"),(.4,"#F4E9A0"),(.65,"#8EDBA8"),(.85,"#3AA8D8"),(1,"#2B3FBF")]),
+ "precip":dict(vars=["tot_prec"], title="Niederschlag (stündlich)", unit="mm", min=0, max=30, decimals=1, gamma=.5,
+               hourly_diff=True, transparent_below=0.1,
+               stops=[(0,"#A8E6A0B0"),(.1,"#5CCB5C"),(.25,"#2EA84A"),(.4,"#F2E84A"),(.55,"#FFA13D"),(.75,"#FF4D4D"),(.9,"#C21BC2"),(1,"#6A1B9A")]),
+ "ptotal":dict(vars=["tot_prec"], title="Niederschlag (Summe seit Start)", unit="mm", min=0, max=100, decimals=0, gamma=.5,
+               transparent_below=0.5,
+               stops=[(0,"#A8E6A0B0"),(.1,"#5CCB5C"),(.25,"#2EA84A"),(.4,"#F2E84A"),(.55,"#FFA13D"),(.75,"#FF4D4D"),(.9,"#C21BC2"),(1,"#6A1B9A")]),
+ "wind":  dict(vars=["u_10m","v_10m"], title="Wind (10 m, Mittel)", unit="km/h", min=0, max=100, decimals=0,
+               comb=lambda u,v: np.hypot(u,v)*3.6, transparent_below=5,
+               stops=[(0,"#7FDBFF66"),(.15,"#3ECF8E"),(.35,"#B6E34A"),(.5,"#FFE14A"),(.7,"#FF9B45"),(.85,"#FF4D4D"),(1,"#B18CFF")]),
+ "gust":  dict(vars=["vmax_10m"], title="Windböen (10 m)", unit="km/h", min=0, max=150, decimals=0,
+               conv=lambda a: a*3.6, transparent_below=20, skip_step0=True,
+               stops=[(0,"#7FDBFF66"),(.2,"#3ECF8E"),(.35,"#B6E34A"),(.5,"#FFE14A"),(.65,"#FF9B45"),(.8,"#FF4D4D"),(.9,"#C21BC2"),(1,"#6A1B9A")]),
+ "cape":  dict(vars=["cape_ml"], title="CAPE (Gewitterenergie)", unit="J/kg", min=0, max=3000, decimals=0, gamma=.6,
+               transparent_below=50,
+               stops=[(0,"#3ECF8E88"),(.12,"#3ECF8E"),(.3,"#F0C93E"),(.55,"#FF9B45"),(.8,"#FF4D4D"),(1,"#C21BC2")]),
+ "cin":   dict(vars=["cin_ml"], title="CIN (Gewitterbremse)", unit="J/kg", min=0, max=300, decimals=0,
+               conv=np.abs, transparent_below=5,
+               stops=[(0,"#6E9CFF88"),(.3,"#6E9CFF"),(.6,"#B18CFF"),(1,"#6A1B9A")]),
+ "cloud": dict(vars=["clct"], title="Bewölkung", unit="%", min=0, max=100, decimals=0, transparent_below=8,
+               stops=[(0,"#DCE6FF00"),(.3,"#DCE6FF55"),(1,"#F4F7FFD0")]),
+ "pmsl":  dict(vars=["pmsl"], title="Luftdruck (auf Meereshöhe)", unit="hPa", min=980, max=1040, decimals=0,
+               conv=lambda a: a/100,
+               stops=[(0,"#6A1B9A"),(.25,"#2E7BFF"),(.5,"#3ECF8E"),(.75,"#FFE14A"),(1,"#FF4D4D")]),
+ "freezing": dict(vars=["hzerocl"], title="Nullgradgrenze", unit="m", min=0, max=4500, decimals=0,
+               stops=[(0,"#6E9CFF"),(.3,"#27C6E8"),(.55,"#3ECF8E"),(.8,"#FFE14A"),(1,"#FF4D4D")]),
+ "snowlmt": dict(vars=["snowlmt"], title="Schneefallgrenze", unit="m", min=0, max=3500, decimals=0,
+               stops=[(0,"#FFFFFF"),(.25,"#B3D4FF"),(.55,"#6E9CFF"),(.8,"#B18CFF"),(1,"#6A1B9A")]),
+ "snowdepth": dict(vars=["h_snow"], title="Schneehöhe", unit="cm", min=0, max=60, decimals=0, gamma=.6,
+               conv=lambda a: a*100, transparent_below=1,
+               stops=[(0,"#DCE6FFAA"),(.25,"#8FB8FF"),(.6,"#6E9CFF"),(1,"#FFFFFF")]),
 }
+ALLVARS = sorted({v for p in PARAMS.values() for v in p["vars"]})
 
 
 def http_get(url, retries=3):
@@ -84,20 +94,21 @@ def list_files(hh, var):
 
 
 def find_latest_run():
+    """Neuester Lauf, bei dem die Kernparameter komplett sind. Fehlende Zusatzparameter werden uebersprungen."""
+    CORE = ["t_2m", "tot_prec", "cape_ml"]
     cands = []
     for hh in RUN_HOURS:
-        try:
-            files = {k: list_files(hh, p["var"]) for k, p in PARAMS.items()}
-        except Exception as e:
-            print(f"  {hh} UTC: uebersprungen ({e})", file=sys.stderr)
-            continue
-        runs = set(r for f in files.values() for (r, _) in f)
-        for run in runs:
-            steps = {k: sorted(s for (r, s) in f if r == run) for k, f in files.items()}
-            n = min(len(v) for v in steps.values())
-            print(f"  Lauf {run}: {n} Stunden (min. ueber alle Parameter)")
-            if n >= MIN_STEPS:
-                cands.append((run, files))
+        files = {}
+        for v in ALLVARS:
+            try:
+                files[v] = list_files(hh, v)
+            except Exception as e:
+                print(f"  {hh} UTC {v}: nicht verfuegbar", file=sys.stderr)
+        for run in set(r for f in files.values() for (r, _) in f):
+            n = lambda v: len([1 for (r, _) in files.get(v, {}) if r == run])
+            print(f"  Lauf {run}: t_2m {n('t_2m')} Stunden")
+            if all(n(v) >= MIN_STEPS for v in CORE):
+                cands.append((run, {v: {k: u for k, u in f.items() if k[0] == run} for v, f in files.items()}))
     if not cands:
         raise SystemExit("Kein vollstaendiger ICON-D2-Lauf gefunden.")
     cands.sort(key=lambda c: c[0])
@@ -175,7 +186,7 @@ def build_palette(cfg):
 
 def render(grid, cfg, pal, path):
     lo, hi = cfg["min"], cfg["max"]
-    idx = np.clip((grid - lo) / (hi - lo), 0, 1) * 254 + 1
+    idx = np.clip((grid - lo) / (hi - lo), 0, 1) ** cfg.get("gamma", 1) * 254 + 1
     idx = np.rint(idx).astype(np.uint8)
     hide = np.isnan(grid)
     if "transparent_below" in cfg:
@@ -200,47 +211,56 @@ def main():
     run, files = find_latest_run()
     run_dt = datetime.strptime(run, "%Y%m%d%H").replace(tzinfo=timezone.utc)
     print("Verwende Lauf", run)
-
     manifest = {"model": "ICON-D2", "resolution_km": 2.2,
                 "run": run_dt.isoformat().replace("+00:00", "Z"),
                 "generated": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
                 "bounds": None, "params": {}}
+    cache = {}                                   # (var, step) -> Gitter; mehrere Karten nutzen dieselbe Variable
+
+    def load(var, step):
+        if (var, step) not in cache:
+            vals, ext = read_grib(http_get(files[var][(run, step)]))
+            cache[(var, step)] = (vals, ext)
+        return cache[(var, step)]
 
     for key, cfg in PARAMS.items():
-        urls = {s: u for (r, s), u in files[key].items() if r == run and s <= args.steps}
-        steps = sorted(urls)
-        print(f"[{key}] lade {len(steps)} Dateien ...")
-        with ThreadPoolExecutor(args.workers) as ex:
-            raws = dict(zip(steps, ex.map(lambda s: http_get(urls[s]), steps)))
+        if any(v not in files or not any(r == run for (r, _) in files[v]) for v in cfg["vars"]):
+            print(f"[{key}] uebersprungen (nicht im DWD-Angebot)")
+            continue
+        steps = sorted(s for (r, s) in files[cfg["vars"][0]] if s <= args.steps)
+        steps = [s for s in steps if all((run, s) in files[v] for v in cfg["vars"])]
+        print(f"[{key}] {len(steps)} Stunden")
+        with ThreadPoolExecutor(args.workers) as ex:   # Downloads parallel vorab
+            list(ex.map(lambda sv: load(sv[1], sv[0]) if (sv[1], sv[0]) not in cache else None,
+                        [(s, v) for s in steps for v in cfg["vars"]]))
         (out / key).mkdir(exist_ok=True)
-        pal = build_palette(cfg)
-        prev = None
-        frames = []
+        pal = build_palette(cfg); prev = None; frames = []
         for s in steps:
-            vals, extent = read_grib(raws[s])
+            arrs = [load(v, s) for v in cfg["vars"]]
+            extent = arrs[0][1]
             if manifest["bounds"] is None:
-                la1, la2, lo1, lo2 = extent
-                manifest["bounds"] = [[la1, lo1], [la2, lo2]]
-            cur = vals
-            if cfg.get("hourly_diff"):
-                if s == 0:
-                    prev = cur; continue
-                vals = np.maximum(cur - (prev if prev is not None else 0), 0)
-                prev = cur
-            elif cfg.get("conv"):
-                vals = cfg["conv"](vals)
-            if s == 0 and key in ("gust",):
-                continue            # Boeen sind bei Stunde 0 nicht sinnvoll
-            grid = reproject(vals, extent, args.scale)
-            fn = f"{key}/{s:03d}.png"
-            render(grid, cfg, pal, out / fn)
+                manifest["bounds"] = [[extent[0], extent[2]], [extent[1], extent[3]]]
+            if "comb" in cfg:
+                vals = cfg["comb"](*[a[0] for a in arrs])
+            else:
+                vals = arrs[0][0]
+                if cfg.get("hourly_diff"):
+                    cur = vals
+                    if s == 0 or prev is None:
+                        prev = cur; continue
+                    vals = np.maximum(cur - prev, 0); prev = cur
+                if cfg.get("conv"):
+                    vals = cfg["conv"](vals)
+            if s == 0 and cfg.get("skip_step0"):
+                continue
+            render(reproject(vals, extent, args.scale), cfg, pal, out / key / f"{s:03d}.png")
             valid = run_dt + timedelta(hours=s)
-            frames.append({"step": s, "valid": valid.isoformat().replace("+00:00", "Z"), "file": fn})
-        manifest["params"][key] = {
-            "title": cfg["title"], "unit": cfg["unit"], "min": cfg["min"], "max": cfg["max"],
-            "decimals": cfg["decimals"], "stops": cfg["stops"], "frames": frames,
-        }
-        del raws
+            frames.append({"step": s, "valid": valid.isoformat().replace("+00:00", "Z"), "file": f"{key}/{s:03d}.png"})
+        manifest["params"][key] = {"title": cfg["title"], "unit": cfg["unit"], "min": cfg["min"], "max": cfg["max"],
+                                   "decimals": cfg["decimals"], "gamma": cfg.get("gamma", 1),
+                                   "stops": cfg["stops"], "frames": frames}
+        if cfg["vars"][0] != "tot_prec":
+            for s in steps: [cache.pop((v, s), None) for v in cfg["vars"]]   # Speicher freigeben
 
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")))
     print("Fertig:", out / "manifest.json")
